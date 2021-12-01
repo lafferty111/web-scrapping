@@ -1,6 +1,4 @@
-const axios = require('axios');
 const cheerio = require('cheerio');
-const readline = require('readline-sync');
 const puppeteer = require('puppeteer');
 const excel = require('excel4node');
 const fs = require('fs');
