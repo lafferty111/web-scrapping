@@ -12,7 +12,7 @@ const tryParsePrice = text => {
     if (!text) return [];
 
     text = text.toLowerCase();
-    let res = text.match(new RegExp('(цене\\s*\\d+)|(\\d+\\s*\\d*(,|\\\.)?\\d+\\s*(₽|руб|р\\\.|p\\\.|рублей|рубля))', 'gi'));
+    let res = text.match(new RegExp('(цене\\s*\\d+)|(\\d+\\s*\\d*(,|\\\.)?\\d+\\s*(₽|руб|р\\\.|p\\\.|рублей|рубля|—))', 'gi'));
     if (!res) res = [];
     const match = text.match(new RegExp('(от\\s*\\d+\\s?\\d*)', 'gi'));
     res = [...res, ...(match || [])];
@@ -102,10 +102,69 @@ const analyzeAd = htmlCode => {
     return data;
 }
 
-const data = fs.readFileSync('pages/google-search/medical-mask.html', { encoding: 'utf8', flag: 'r' });
+let googleSearch = [];
 const files = fs.readdirSync('pages/google-search');
 files.forEach(file => {
     const data = fs.readFileSync('pages/google-search/' + file, { encoding: 'utf-8', flag: 'r' });
-    const analyzedData = analyzeAd(data);
-    fs.writeFileSync('logs/google-search/results-' + file + '.json', JSON.stringify(analyzedData, null, '\t'));
+    googleSearch = [...googleSearch, ...analyzeAd(data)];
+    fs.writeFileSync('logs/google-search/results-' + file + '.json', JSON.stringify(googleSearch, null, '\t'));
 })
+
+const hrefs = googleSearch.map(({ href }) => href);
+
+let browser;
+let page;
+
+(async () => {
+    // Открываем браузер в хедлесс режиме (чтобы прогрузился динамический контент)
+    console.log('Open browser...');
+    browser = await puppeteer.launch({
+        headless: false
+    });
+    console.log('Open new page...');
+    page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36');
+
+    for (let i = 45; i < hrefs.length; ++i) {
+        const href = hrefs[i];
+        let html;
+        try {
+            await page.goto(href);
+            await page.waitForSelector('html');
+            html = await page.content();
+        } catch (e) {
+            console.log('Error go to ' + href);
+            continue;
+        }
+
+        const $ = cheerio.load(html);
+
+        console.log("START PARSING..." + href);
+        let pricesBlocks = $('span[class*=price]:contains(₽), div[class*=price]:contains(₽), p[class*=price]:contains(₽)');
+        let prices = [];
+        if (pricesBlocks.length > 0) {
+            pricesBlocks.map((_, element) => $(element).text()).get()
+                .forEach(price => prices = [...prices, ...tryParsePrice(price)]);
+        } else {
+            pricesBlocks = $('span[class*=price]:contains(руб.), div[class*=price]:contains(руб.), p[class*=price]:contains(руб.)');
+            if (pricesBlocks.length > 0) {
+                pricesBlocks.map((_, element) => $(element).text()).get()
+                    .forEach(price => prices = [...prices, ...tryParsePrice(price)]);
+            } else {
+                pricesBlocks = $('span[class*=price]:contains(р.), div[class*=price]:contains(р.), p[class*=price]:contains(р.)');
+                if (pricesBlocks.length > 0) {
+                    pricesBlocks.map((_, element) => $(element).text()).get()
+                        .forEach(price => prices = [...prices, ...tryParsePrice(price)]);
+                } else {
+                    pricesBlocks = $('span[class*=price], div[class=*price], p[class*=price]');
+                    if (pricesBlocks.length > 0) {
+                        pricesBlocks.map((_, element) => $(element).text()).get()
+                            .forEach(price => prices = [...prices, ...tryParsePrice(price)])
+                    }
+                }
+            }
+        }
+
+        console.log(prices)
+    }
+})();
