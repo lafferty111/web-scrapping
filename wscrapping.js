@@ -23,6 +23,30 @@ const tryParsePrice = text => {
     return Array.from(new Set(normalized));
 }
 
+//Функция для поиска заголовка товара рядом с ценой по ключевым словам
+const findTitleAroundPriceByKeywords = ($, element, keywords) => {
+    let parent = element.parent();
+    while (parent.length !== 0) {
+        let founded;
+
+        $(parent).children().each((_, el) => {
+            if (el === element.get()[0]) return;
+            const text = $(el).text();
+            const includesKeyWord = keywords.some(word => text.includes(word));
+            if (includesKeyWord) {
+                founded = text;
+            }
+        });
+
+        if (founded) {
+            // console.log(founded.split('\n'))
+            return founded.split('\n').filter(text => keywords.some(word => new RegExp(`\\b${word}\\b`, 'gi').test(text))).join(' ').replace(/\s\s+/g, ' ').trim();
+        }
+
+        parent = parent.parent();
+    }
+}
+
 // Анализ рекламы гугл
 const analyzeAd = htmlCode => {
     const data = [];
@@ -116,16 +140,18 @@ let browser;
 let page;
 
 (async () => {
+    const keywords = ['Apple', 'Watch', 'Series', '7'];
+
     // Открываем браузер в хедлесс режиме (чтобы прогрузился динамический контент)
     console.log('Open browser...');
     browser = await puppeteer.launch({
-        headless: false
+        // headless: false
     });
     console.log('Open new page...');
     page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36');
 
-    for (let i = 45; i < hrefs.length; ++i) {
+    for (let i = 0; i < 10; ++i) {
         const href = hrefs[i];
         let html;
         try {
@@ -134,6 +160,7 @@ let page;
             html = await page.content();
         } catch (e) {
             console.log('Error go to ' + href);
+            console.log(e)
             continue;
         }
 
@@ -143,24 +170,30 @@ let page;
         let pricesBlocks = $('span[class*=price]:contains(₽), div[class*=price]:contains(₽), p[class*=price]:contains(₽)');
         let prices = [];
         if (pricesBlocks.length > 0) {
-            pricesBlocks.map((_, element) => $(element).text()).get()
-                .forEach(price => prices = [...prices, ...tryParsePrice(price)]);
+            pricesBlocks.map((_, element) => {
+                const title = findTitleAroundPriceByKeywords($, $(element), keywords);
+                return { title, price: $(element).text() };
+            }).get().forEach(({ title, price }) => prices = [...prices, { title, prices: tryParsePrice(price) }]);
         } else {
             pricesBlocks = $('span[class*=price]:contains(руб.), div[class*=price]:contains(руб.), p[class*=price]:contains(руб.)');
             if (pricesBlocks.length > 0) {
-                pricesBlocks.map((_, element) => $(element).text()).get()
-                    .forEach(price => prices = [...prices, ...tryParsePrice(price)]);
+                pricesBlocks.map((_, element) => {
+                    const title = findTitleAroundPriceByKeywords($, $(element), keywords);
+                    return { title, price: $(element).text() };
+                }).get().forEach(({ title, price }) => prices = [...prices, { title, prices: tryParsePrice(price) }]);
             } else {
                 pricesBlocks = $('span[class*=price]:contains(р.), div[class*=price]:contains(р.), p[class*=price]:contains(р.)');
                 if (pricesBlocks.length > 0) {
-                    pricesBlocks.map((_, element) => $(element).text()).get()
-                        .forEach(price => prices = [...prices, ...tryParsePrice(price)]);
+                    pricesBlocks.map((_, element) => {
+                        const title = findTitleAroundPriceByKeywords($, $(element), keywords);
+                        return { title, price: $(element).text() };
+                    }).get().forEach(({ title, price }) => prices = [...prices, { title, prices: tryParsePrice(price) }]);
                 } else {
                     pricesBlocks = $('span[class*=price], div[class=*price], p[class*=price]');
-                    if (pricesBlocks.length > 0) {
-                        pricesBlocks.map((_, element) => $(element).text()).get()
-                            .forEach(price => prices = [...prices, ...tryParsePrice(price)])
-                    }
+                    pricesBlocks.map((_, element) => {
+                        const title = findTitleAroundPriceByKeywords($, $(element), keywords);
+                        return { title, price: $(element).text() };
+                    }).get().forEach(({ title, price }) => prices = [...prices, { title, prices: tryParsePrice(price) }]);
                 }
             }
         }
