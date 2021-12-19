@@ -359,7 +359,7 @@ const pricePattern = new RegExp('(от\\s\\d+\\s?\\d+(,|\\\.)?\\d+)|(\\d+\\s?\\d
         const $ = cheerio.load(htmlPage);
         // Ищем элементы с тегом a, у которых в дочерних элементах есть тег h3, являющийся ссылкой на сайт
         // Анализ поисковых ответов и предоставленной рекламы
-        refs.push(...$('a').map((index, element) => {
+        refs = refs.concat($('a').map((index, element) => {
             if (!element.attribs.href) return null;
             // Убираем префиксы и постфиксы
             let normalizedRef = element.attribs.href.replace(googleHrefPrefix, '');
@@ -373,7 +373,7 @@ const pricePattern = new RegExp('(от\\s\\d+\\s?\\d+(,|\\\.)?\\d+)|(\\d+\\s?\\d
                 .reduce((acc, child) => {
                     // Анализируем описание ссылки
                     const description = $(element.parent.parent).text();
-                    const extracted = description.match(pricePattern) || [];
+                    let extracted = description.match(pricePattern) || [];
 
                     // Анализируем заголовок ссылки
                     const title = $(child).text();
@@ -382,7 +382,7 @@ const pricePattern = new RegExp('(от\\s\\d+\\s?\\d+(,|\\\.)?\\d+)|(\\d+\\s?\\d
                     // Записываем в логи то, что распарсили
                     fs.appendFileSync('logs.txt', 'DESCRIPTION === ' + description + '\nTITLE === ' + title + '\nPARSED PRICE DESCRIPTION === ' + extracted + '\nPARSED PRICE tITLE === ' + match + '\n\n\n')
 
-                    if (match) extracted.push(...match);
+                    if (match) extracted = extracted.concat(match);
 
                     if (extracted.length > 0) {
                         const prices = extracted.map(str => str.replace(/(от\s?)|\s|(за\s?)/gi, '')).map(number => parseFloat(number));
@@ -399,7 +399,7 @@ const pricePattern = new RegExp('(от\\s\\d+\\s?\\d+(,|\\\.)?\\d+)|(\\d+\\s?\\d
         }).get());
 
         // Если гугл выдал рекламный блок, анализируем и его
-        refs.push(...$('a.clickable-card').map((index, element) => {
+        refs = refs.concat($('a.clickable-card').map((index, element) => {
             if (element.attribs.href.startsWith('/')) return null;
             const href = element.attribs.href;
             const label = element.attribs['aria-label'];

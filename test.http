@@ -1,0 +1,6 @@
+POST http://localhost:3030/scan
+Content-Type: application/json
+
+{
+    "searchString": "Apple Watch Series 7"
+}
