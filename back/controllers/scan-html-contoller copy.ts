@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { UniversalSiteScrapper } from "../scrappers/UniversalSiteScrapper";
+import { UniversalSiteScrapper } from "../lib/UniversalSiteScrapper";
 
 export const scanHtmlController = async (req: Request, res: Response) => {
     const { html, keywords, scanSettings } = req.body;
