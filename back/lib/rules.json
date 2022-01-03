@@ -1,0 +1,7 @@
+{
+    "technopark.ru": {
+        "domain": "technopark.ru",
+        "priceSelector": "span.price",
+        "titleSelector": "div.card-listing__title"
+    }
+}
