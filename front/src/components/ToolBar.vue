@@ -28,6 +28,31 @@
       @close="closeScanFromUrlDialog"
     ></ScanFromUrls>
 
+    <el-dialog v-model="scanFromFileDialog" title="Сканирование с файла">
+      <el-input
+        placeholder="Название товара"
+        v-model="scanSearchStr"
+      ></el-input>
+      <el-autocomplete
+        v-model="domain"
+        class="autocomplete"
+        :fetch-suggestions="querySearch"
+        placeholder="Домен сайта"
+        @select="handleSelect"
+      ></el-autocomplete>
+      <el-input
+        placeholder="Селектор для цены"
+        v-model="priceSelector"
+      ></el-input>
+      <el-input
+        placeholder="Селектор для названия товара"
+        v-model="titleSelector"
+      ></el-input>
+      <el-button type="primary" @click="pickFileAndScan()"
+        >Выбрать файл и сканировать</el-button
+      >
+    </el-dialog>
+
     <Configuration
       :dialogVisible="configDialog"
       @change-dialog-visible="(value) => (configDialog = value)"
@@ -49,6 +74,7 @@ import { Utils } from "../utils/Utils";
 import ScanFromUrls from "./ScanFromUrls.vue";
 import ErrorDialog from "./ErrorDialog.vue";
 import Configuration from "./Configuration.vue";
+import { ConfigStorage } from "../utils/ConfigStorage";
 
 export default {
   name: "ToolBar",
@@ -63,6 +89,7 @@ export default {
       const reader = new FileReader();
       reader.onload = (e) => {
         this.scanContent(e.target.result);
+        this.$refs.fileUpload.value = null;
       };
       reader.readAsText(file);
     };
@@ -70,6 +97,16 @@ export default {
   watch: {
     items(value) {
       this.$emit("change-items", value);
+    },
+    domain(value) {
+      const rule = ConfigStorage.getRuleByDomain(value);
+      if (rule && rule.domain) {
+        this.priceSelector = rule.priceSelector;
+        this.titleSelector = rule.titleSelector;
+      } else {
+        this.priceSelector = "";
+        this.titleSelector = "";
+      }
     },
   },
   props: {
@@ -91,6 +128,11 @@ export default {
       scanFromUrls: false,
 
       configDialog: false,
+      scanFromFileDialog: false,
+      domain: "",
+      scanSearchStr: "",
+      priceSelector: "",
+      titleSelector: "",
     };
   },
   methods: {
@@ -129,7 +171,7 @@ export default {
     },
 
     scanContent(content) {
-      if (!this.searchStr) {
+      if (!this.scanSearchStr) {
         this.isError = true;
         this.errorTitle = "Ошибка";
         this.errorMsg = "Пожалуйста, введите поисковый запрос";
@@ -137,7 +179,11 @@ export default {
       }
 
       this.$emit("scan-start");
-      API.scanContent(this.searchStr, content)
+      API.scanContent(this.scanSearchStr, content, this.domain, {
+        domain: this.domain,
+        priceSelector: this.priceSelector,
+        titleSelector: this.titleSelector,
+      })
         .then((res) => res.json())
         .then((result) => this.onScan(result))
         .catch((e) => {
@@ -162,6 +208,10 @@ export default {
     },
 
     scanFromFile() {
+      this.scanFromFileDialog = true;
+    },
+
+    pickFileAndScan() {
       this.$refs.fileUpload.click();
     },
 
@@ -183,6 +233,16 @@ export default {
     scanStop() {
       this.$emit("scan-stop", this.items);
     },
+
+    querySearch(queryString, cb) {
+      const domains = ConfigStorage.getRules().map(rule => ({value: rule.domain}));
+      const results = domains.filter(domain => domain.value.includes(queryString));
+      cb(results);
+    },
+
+    handleSelect(item) {
+      this.domain = item.value;
+    }
   },
 };
 </script>
@@ -194,5 +254,9 @@ export default {
 
 .scan-btn {
   margin-top: 10px !important;
+}
+
+.autocomplete {
+  width: 100%;
 }
 </style>

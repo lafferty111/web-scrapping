@@ -11,7 +11,7 @@ export class ParseUtils {
       return ref.substring(
         httpIndex + httpPrefix.length,
         ref.indexOf("/", httpIndex + httpPrefix.length)
-      );
+      ).replace('www.', '');
     }
 
     if (ref.includes(httpsPrefix)) {
@@ -19,10 +19,10 @@ export class ParseUtils {
       return ref.substring(
         httpsIndex + httpsPrefix.length,
         ref.indexOf("/", httpsIndex + httpsPrefix.length)
-      );
+      ).replace('www.', '');
     }
 
-    return "";
+    return ref;
   }
 
   // Функция для парсинга даты из строки
@@ -67,8 +67,8 @@ export class ParseUtils {
       const children = $(parent).children().get();
 
       for (let i = 0; i < children.length; ++i) {
-        const text = $(children[i]).text();
-        const includesKeyWord = keywords.some((word) => text.includes(word));
+        const text = $(children[i]).text().toLowerCase();
+        const includesKeyWord = keywords.some((word) => text.includes(word.toLowerCase()));
         if (includesKeyWord) {
           founded = text;
           break;
@@ -80,7 +80,7 @@ export class ParseUtils {
           .split("\n")
           .filter((text) =>
             keywords.some((word) =>
-              new RegExp(`\\b${word}\\b`, "gi").test(text)
+              text.includes(word.toLowerCase())
             )
           )
           .join(" ")

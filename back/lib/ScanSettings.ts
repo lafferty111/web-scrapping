@@ -1,6 +1,7 @@
 export interface ScanSettings {
   scanAd: boolean;
   scanFirst: boolean;
+  advanced: boolean;
   scanWithoutPrice: boolean;
   scanWithoutTitle: boolean;
   urls?: string[];

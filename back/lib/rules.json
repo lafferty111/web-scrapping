@@ -3,5 +3,10 @@
         "domain": "technopark.ru",
         "priceSelector": "span.price",
         "titleSelector": "div.card-listing__title"
+    },
+    "perekrestok.ru": {
+        "domain": "perekrestok.ru",
+        "priceSelector": "div.price-new",
+        "titleSelector": "div.product-card__title"
     }
 }

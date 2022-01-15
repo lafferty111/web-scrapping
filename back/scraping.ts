@@ -1,7 +1,7 @@
 // Библиотека для работы с файловой системой
 import * as fs from "fs";
-import { Page } from "puppeteer";
-import { Browser } from "puppeteer";
+import { Browser, Page } from "puppeteer";
+import _fetch from "node-fetch";
 
 import { GoogleAdScrapper } from "./lib/GoogleAdScrapper";
 import { GoogleSearchResultsScrapper } from "./lib/GoogleSearchResultsScrapper";
@@ -10,6 +10,29 @@ import { ScrapedResult } from "./lib/types";
 import { UniversalSiteScrapper } from "./lib/UniversalSiteScrapper";
 
 const snooze = (ms: any) => new Promise((resolve) => setTimeout(resolve, ms));
+let i = 0;
+const getDataFromSite = async (
+  site: string,
+  scrapeSettings: ScanSettings,
+  page: Page
+) => {
+  try {
+    if (scrapeSettings.advanced) {
+      await page.goto(site);
+      await page.waitForSelector("html");
+
+      return await page.content();
+    } else {
+      const res = await _fetch(site);
+      const text = await res.text();
+      fs.writeFileSync("file " + i + ".html", text, { encoding: "utf-8" });
+      ++i;
+      return text;
+    }
+  } catch (e) {
+    console.error("Failed to go to " + site + " page: " + e.message);
+  }
+};
 
 function* Counter(): Generator<number, number, number> {
   let count = 0;
@@ -59,9 +82,7 @@ export const scrapeSitesByKeyWords = async (
       notifyCallback &&
         notifyCallback(`Переход по ссылке ${path}...`, lastValue);
 
-      await page.goto(path);
-
-      const data = await page.content();
+      const data = await getDataFromSite(path, scrapeSettings, page);
 
       if (scrapeSettings.scanAd) {
         lastValue = counter.next(step).value;
@@ -100,15 +121,9 @@ export const scrapeSitesByKeyWords = async (
           counter.next(step).value
         );
 
-      try {
-        await page.goto(href);
-        await page.waitForSelector("html");
-        html = await page.content();
-      } catch (e) {
-        console.log("Error go to " + href);
-        console.log(e);
-        continue;
-      }
+      html = await getDataFromSite(href, scrapeSettings, page);
+
+      if (!html) continue;
 
       notifyCallback &&
         notifyCallback(`Скрейпим ${href}...`, counter.next(step).value);
@@ -137,7 +152,7 @@ export const scrapeSitesByKeyWords = async (
       return grouped;
     }
 
-    return [...googleSearch, ...refSites];
+    return applyFilters(scrapeSettings, [...googleSearch, ...refSites]);
   } finally {
     console.log("Close browser page...");
     if (page) page.close();
@@ -168,27 +183,92 @@ export const scrapeSitesFromUrls = async (
     notifyCallback && notifyCallback(`Переходим на сайт ${url}...`, counter);
 
     counter += stepSize;
-    try {
-      await page.goto(url);
-      await page.waitForSelector("html");
-      const html = await page.content();
-      const siteScrapper = new UniversalSiteScrapper(
-        html,
-        keywords,
-        scanSettings.urls[i],
-        scanSettings
-      );
 
-      notifyCallback && notifyCallback(`Скрейпим сайт ${url}...`, counter);
-      results = results.concat(siteScrapper.scrape());
-    } catch (e) {
-      console.log("Error go to " + scanSettings.urls[i]);
-      console.log(e);
-      continue;
-    }
+    const html = await getDataFromSite(url, scanSettings, page);
+
+    const siteScrapper = new UniversalSiteScrapper(
+      html,
+      keywords,
+      scanSettings.urls[i],
+      scanSettings
+    );
+
+    notifyCallback && notifyCallback(`Скрейпим сайт ${url}...`, counter);
+    results = results.concat(siteScrapper.scrape());
   }
 
   return applyFilters(scanSettings, results);
+};
+
+export const scrapeGoogleResultsFromContent = async (
+  keywords: any,
+  content: string,
+  scrapeSettings: ScanSettings,
+  groupByDomain: boolean,
+  browser: Browser,
+  notifyCallback?: (msg: string, percentage: number) => void
+) => {
+  let results: ScrapedResult[] = [];
+  let googleSearch: ScrapedResult[] = [];
+
+  notifyCallback ?? notifyCallback("Подготовка...", 0);
+
+  if (scrapeSettings.scanAd) {
+    notifyCallback && notifyCallback("Сканируем рекламные блоки...", 10);
+    const googleAdScrapper = new GoogleAdScrapper(content, scrapeSettings);
+    googleSearch = googleSearch.concat(googleAdScrapper.scrape());
+  }
+
+  notifyCallback && notifyCallback("Сканируем результаты выдачи...", 15);
+
+  const googleSearchResultsScrapper = new GoogleSearchResultsScrapper(
+    content,
+    scrapeSettings
+  );
+  googleSearch = googleSearch.concat(googleSearchResultsScrapper.scrape());
+
+  const hrefs = Array.from(new Set(googleSearch.map(({ href }) => href)));
+
+  const counter = Counter();
+  counter.next(20);
+  const step = 75 / (hrefs.length * 2);
+
+  let page: Page;
+  try {
+    page = await createNewBrowserPage(browser);
+
+    for (let i = 0; i < hrefs.length; ++i) {
+      const href = hrefs[i];
+      let html;
+
+      notifyCallback &&
+        notifyCallback(
+          `Переход по ссылке ${href}...`,
+          counter.next(step).value
+        );
+
+      html = await getDataFromSite(href, scrapeSettings, page);
+
+      notifyCallback &&
+        notifyCallback(`Скрейпим ${href}...`, counter.next(step).value);
+
+      const siteScrapper = new UniversalSiteScrapper(
+        html,
+        keywords,
+        href,
+        scrapeSettings
+      );
+
+      results = results.concat(siteScrapper.scrape());
+    }
+  } catch (e) {
+    console.error(e);
+    if (page) page.close();
+  }
+
+  notifyCallback && notifyCallback(`Завершение...`, 100);
+
+  return results;
 };
 
 export const scrapeSitesFromContent = async (
@@ -196,6 +276,7 @@ export const scrapeSitesFromContent = async (
   content: string,
   scanSettings: ScanSettings,
   groupByDomain: boolean,
+  domain?: string,
   notifyCallback?: (msg: string, percentage: number) => void
 ) => {
   let results: ScrapedResult[] = [];
@@ -205,7 +286,7 @@ export const scrapeSitesFromContent = async (
   const siteScrapper = new UniversalSiteScrapper(
     content,
     keywords,
-    "",
+    domain || "",
     scanSettings
   );
 

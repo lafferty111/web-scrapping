@@ -48,7 +48,7 @@ export class UniversalSiteScrapper extends Scrapper {
     const domain = ParseUtils.getDomain(this.href);
 
     const scrapeSettings = this.scanSettings.customSiteScrapingSettings[domain];
-    if (scrapeSettings) {
+    if (!!scrapeSettings && scrapeSettings.priceSelector) {
       return this.scrapeWithSettings(scrapeSettings);
     }
 
@@ -84,7 +84,7 @@ export class UniversalSiteScrapper extends Scrapper {
 
     for (let i = 0; i < pricesBlocks.length; ++i) {
       const prices = this.$(pricesBlocks.get(i)).text();
-      const title = this.$(titleBlocks.get(i)).text();
+      const title = this.$(titleBlocks.get(i)).text().replace(/\s\s+/gim, "");
 
       result.push({
         title,

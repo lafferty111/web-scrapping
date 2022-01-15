@@ -15,6 +15,7 @@ import * as puppeteer from "puppeteer";
 
 import { ScanSettings } from "./ScanSettings";
 import {
+  scrapeGoogleResultsFromContent,
   scrapeSitesByKeyWords,
   scrapeSitesFromContent,
   scrapeSitesFromUrls,
@@ -26,6 +27,8 @@ interface Args {
   mode: 1 | 2 | 3 | 4;
   keywords: string[];
   pathToFileToScrape: string;
+  domain: string;
+  pageType: string;
   pageCount: number;
   export: string;
   urls: string[];
@@ -71,6 +74,13 @@ const options: Args = yargs
     demandOption: false,
     default: false,
   })
+  .option("d", {
+    alias: "domain",
+    describe: "Домен сайта для поиска правил в реестре",
+    type: "string",
+    demandOption: false,
+    default: "",
+  })
   .option("p", {
     alias: "scanWithoutPrice",
     describe: "Показывать товары без цены",
@@ -101,6 +111,13 @@ const options: Args = yargs
   .option("e", {
     alias: "export",
     describe: "Экспортировать результат скрейпинга в json или csv файл",
+    type: "string",
+    demandOption: false,
+    default: "",
+  })
+  .option("", {
+    alias: "pageType",
+    describe: "Тип страницы для скрейпинга - google или site",
     type: "string",
     demandOption: false,
     default: "",
@@ -161,18 +178,34 @@ puppeteer.launch().then(async (browser) => {
         console.log("Введите путь до файла");
         return;
       }
+      if (!options.pageType) {
+        console.log("Введите тип файла");
+        return;
+      }
       const filePath = path.join(process.cwd(), options.pathToFileToScrape);
       const data = fs.readFileSync(filePath, {
         encoding: "utf-8",
       });
 
-      results = await scrapeSitesFromContent(
-        options.keywords,
-        data,
-        scrapeSettings,
-        false,
-        (msg, percentage) => console.log(`${percentage}%: ${msg}`)
-      );
+      if (options.pageType === "google") {
+        results = await scrapeGoogleResultsFromContent(
+          options.keywords,
+          data,
+          scrapeSettings,
+          false,
+          browser,
+          (msg, percentage) => console.log(`${percentage}%: ${msg}`)
+        );
+      } else {
+        results = await scrapeSitesFromContent(
+          options.keywords,
+          data,
+          scrapeSettings,
+          false,
+          options.domain,
+          (msg, percentage) => console.log(`${percentage}%: ${msg}`)
+        );
+      }
       break;
     // Скрейпинг поиском в гугле
     case 3:
@@ -181,7 +214,7 @@ puppeteer.launch().then(async (browser) => {
         scrapeSettings,
         false,
         browser,
-        (msg, percentage) => console.log(`${percentage}%: ${msg}`),
+        (msg, percentage) => console.log(`${percentage}%: ${msg}`)
       );
       break;
     default:

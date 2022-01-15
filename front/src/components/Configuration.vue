@@ -3,6 +3,10 @@
     <el-dialog v-model="intDialogVisible" title="Конфигурация">
       <div class="settings">
         <el-checkbox
+          v-model="advanced"
+          label="Продвинутый поиск (медленнее, но поддержка большего количества сайтов)"
+        ></el-checkbox>
+        <el-checkbox
           v-model="scanAd"
           label="Сканировать рекламу выдачи поисковых результатов Google"
         ></el-checkbox>
@@ -18,6 +22,7 @@
           v-model="scanWithoutTitle"
           label="Показывать товары без названия"
         ></el-checkbox>
+        <el-input-number v-model="pageCount" label="Количество страниц для сканирования" :min="1" :max="10"></el-input-number>
         <el-button
           class="rule-registry"
           type="primary"
@@ -48,7 +53,8 @@
       </el-button>
 
       <div class="registry-list">
-        <div v-for="rule in rules" :key="rule.domain">
+        <div v-for="rule in rules" class="rule" :key="rule.domain">
+          <div class="rule_delete" @click="deleteRule(rule)">Удалить</div>
           <div><strong>Домен:</strong> {{ rule.domain }}</div>
           <div>
             <strong>Селектор для цены:</strong> {{ rule.priceSelector }}
@@ -92,6 +98,12 @@ export default {
     },
     scanWithoutTitle(newVal) {
       ConfigStorage.setScanWithoutTitle(newVal);
+    },
+    pageCount(newVal) {
+      ConfigStorage.setPageCount(newVal);
+    },
+    advanced(newVal) {
+      ConfigStorage.setAdvanced(newVal);
     }
   },
   data() {
@@ -102,6 +114,8 @@ export default {
       scanWithoutPrice: ConfigStorage.getScanWithoutPrice(),
       scanWithoutTitle: ConfigStorage.getScanWithoutTitle(),
       rules: ConfigStorage.getRules(),
+      pageCount: ConfigStorage.getPageCount(),
+      advanced: ConfigStorage.getAdvanced(),
 
       ruleDomain: "",
       rulePrice: "",
@@ -120,6 +134,10 @@ export default {
       ConfigStorage.addRule(this.ruleDomain, this.rulePrice, this.ruleTitle);
       this.$emit("change-rule", this.rules);
     },
+    deleteRule(rule) {
+      this.rules = this.rules.filter(_rule => _rule.domain !== rule.domain);
+      ConfigStorage.deleteRule(rule);
+    }
   },
 };
 </script>
@@ -156,5 +174,17 @@ export default {
 
 .add-rule {
   margin-top: 20px !important;
+}
+
+.rule {
+  position: relative;
+}
+
+.rule_delete {
+  position: absolute;
+  right: 0;
+  cursor: pointer;
+  color: gray;
+  font-size: 11px;
 }
 </style>

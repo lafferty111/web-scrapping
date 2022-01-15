@@ -5,7 +5,7 @@ import {
   scrapeSitesFromContent,
   scrapeSitesFromUrls,
 } from "../scraping";
-import { wsConnections } from "../srv-launcher";
+import { browser, wsConnections } from "../srv-launcher";
 import { WsUtils } from "../utils/WsUtils";
 
 const createProgressNotifyCallback =
@@ -26,6 +26,7 @@ export const scanController = async (req: Request, res: Response) => {
     keywords,
     scanSettings,
     groupByDomain,
+    browser,
     createProgressNotifyCallback(connectionWs)
   );
   res.send(prices);
@@ -46,13 +47,14 @@ export const scanFromUrlsController = async (req: Request, res: Response) => {
     keywords,
     scanSettings,
     groupByDomain,
-    createProgressNotifyCallback(connectionWs)
+    createProgressNotifyCallback(connectionWs),
+    browser
   );
   res.send(prices);
 };
 
 export const scanContentController = async (req: Request, res: Response) => {
-  const { scanSettings, searchString, groupByDomain, content } = req.body;
+  const { scanSettings, searchString, groupByDomain, content, domain } = req.body;
   const connectionWsKey = req.headers.authorization;
   const connectionWs = wsConnections[connectionWsKey];
   if (!searchString || !content || !connectionWsKey || !connectionWs) {
@@ -67,6 +69,7 @@ export const scanContentController = async (req: Request, res: Response) => {
     content,
     scanSettings,
     groupByDomain,
+    domain,
     createProgressNotifyCallback(connectionWs)
   );
   res.send(prices);

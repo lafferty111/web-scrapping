@@ -4,7 +4,6 @@ import { ScrapedResult } from "../lib/types";
 
 export const csvController = async (req: Request, res: Response) => {
     const scrapedResult: ScrapedResult[] = req.body;
-    console.log(scrapedResult)
     
     ExportUtils.exportAsCsv(scrapedResult, res);
 }

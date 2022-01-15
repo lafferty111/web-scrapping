@@ -37,6 +37,8 @@ export class ConfigStorage {
             scanFirst: this.getScanFirst(),
             scanWithoutPrice: this.getScanWithoutPrice(),
             scanWithoutTitle: this.getScanWithoutTitle(),
+            pageCount: this.getPageCount(),
+            advanced: this.getAdvanced(),
             customSiteScrapingSettings: this.getRules().reduce(
                 (acc, curr) => ({ ...acc, [curr.domain]: curr }),
                 {}
@@ -52,6 +54,14 @@ export class ConfigStorage {
         }
     }
 
+    static getRuleByDomain(domain) {
+        try {
+            return JSON.parse(localStorage.getItem('rules') || '[]').filter(item => item.domain === domain)[0];
+        } catch (e) {
+            return {};
+        }
+    }
+
     static addRule(domain, priceSelector, titleSelector) {
         const rules = this.getRules();
         rules.push({
@@ -60,5 +70,26 @@ export class ConfigStorage {
             titleSelector,
         });
         localStorage.setItem("rules", JSON.stringify(rules));
+    }
+
+    static deleteRule(rule) {
+        const rules = this.getRules().filter(_rule => _rule.domain !== rule.domain);
+        localStorage.setItem("rules", rules);
+    }
+
+    static getPageCount() {
+        return parseInt(localStorage.getItem("pageCount"));
+    }
+
+    static setPageCount(val) {
+        localStorage.setItem("pageCount", val);
+    }
+
+    static getAdvanced() {
+        return localStorage.getItem("advanced") === "true";
+    }
+
+    static setAdvanced(val) {
+        localStorage.setItem("advanced", val);
     }
 }
